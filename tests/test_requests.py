@@ -1452,6 +1452,129 @@ class TestRequests:
         r = requests.Response()
         assert r.content is None
 
+    @pytest.mark.parametrize(
+        "content_type",
+        (
+            "application/json",
+            "ApPlIcAtIoN/JsOn",
+            "application/json; charset=utf-8",
+            "application/problem+json",
+            "application/vnd.api+json",
+            "APPLICATION/PROBLEM+JSON; charset=utf-8",
+        ),
+    )
+    def test_response_is_json_matching_content_type(self, content_type):
+        r = requests.Response()
+        r.headers["Content-Type"] = content_type
+
+        assert r.is_json is True
+
+    @pytest.mark.parametrize(
+        "content_type",
+        (
+            None,
+            "",
+            " \t ",
+            "text/json",
+            "text/problem+json",
+            "application/jsonp",
+            "application/json-seq",
+            "application/json, text/html",
+            "application/json, application/problem+json",
+            "application/foo bar+json",
+            "application/foo\tbar+json",
+            "application/ json",
+            "application /json",
+            "image/png",
+        ),
+    )
+    def test_response_is_json_nonmatching_content_type(self, content_type):
+        r = requests.Response()
+        if content_type is not None:
+            r.headers["Content-Type"] = content_type
+
+        assert r.is_json is False
+
+    @pytest.mark.parametrize(
+        "content_type, expected",
+        (("application/json", True), ("text/html", False)),
+    )
+    def test_response_is_json_does_not_access_body(self, content_type, expected):
+        r = requests.Response()
+        r.headers["Content-Type"] = content_type
+        r.status_code = 200
+        raw = mock.Mock()
+        raw.read.side_effect = AssertionError("is_json must not read the body")
+        raw.stream.side_effect = AssertionError("is_json must not stream the body")
+        r.raw = raw
+
+        with (
+            mock.patch.object(
+                requests.Response,
+                "content",
+                new_callable=mock.PropertyMock,
+                side_effect=AssertionError("is_json must not access content"),
+            ) as content,
+            mock.patch.object(
+                requests.Response,
+                "text",
+                new_callable=mock.PropertyMock,
+                side_effect=AssertionError("is_json must not decode the body"),
+            ) as text,
+            mock.patch.object(
+                requests.Response,
+                "json",
+                side_effect=AssertionError("is_json must not call json()"),
+            ) as json_method,
+        ):
+            assert r.is_json is expected
+
+        content.assert_not_called()
+        text.assert_not_called()
+        json_method.assert_not_called()
+        raw.read.assert_not_called()
+        raw.stream.assert_not_called()
+        assert r.raw is raw
+        assert r._content is False
+        assert r._content_consumed is False
+        assert r.encoding is None
+
+    @pytest.mark.parametrize(
+        "content_type, expected",
+        (("application/json", True), ("text/html", False)),
+    )
+    def test_response_is_json_ignores_invalid_buffered_body(self, content_type, expected):
+        r = requests.Response()
+        r.headers["Content-Type"] = content_type
+        body = b"this is not valid JSON"
+        r._content = body
+        r._content_consumed = True
+        r.encoding = "utf-8"
+
+        with mock.patch.object(
+            requests.Response,
+            "json",
+            side_effect=AssertionError("is_json must not call json()"),
+        ) as json_method:
+            assert r.is_json is expected
+
+        json_method.assert_not_called()
+        assert r._content is body
+        assert r._content_consumed is True
+        assert r.encoding == "utf-8"
+        assert r.raw is None
+        with pytest.raises(requests.exceptions.JSONDecodeError):
+            r.json()
+
+    def test_response_is_json_is_read_only(self):
+        r = requests.Response()
+        r.headers["Content-Type"] = "application/json"
+
+        with pytest.raises(AttributeError):
+            r.is_json = False
+
+        assert r.is_json is True
+
     def test_response_is_iterable(self):
         r = requests.Response()
         io = StringIO.StringIO("abc")
