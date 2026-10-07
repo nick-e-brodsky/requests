@@ -5,6 +5,9 @@ dev
 ---
 
 - \[Short description of non-trivial change.\]
+- Added the public, read-only `Response.is_json` boolean property, based only
+  on the declared `Content-Type` header; it does not read or decode the body
+  and does not guarantee that the body contains valid JSON.
 
 
 2.34.2 (2026-05-14)
