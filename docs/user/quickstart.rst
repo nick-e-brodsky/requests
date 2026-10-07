@@ -148,8 +148,23 @@ There's also a builtin JSON decoder, in case you're dealing with JSON data::
     >>> import requests
 
     >>> r = requests.get('https://api.github.com/events')
-    >>> r.json()
+    >>> if r.is_json:
+    ...     r.json()
+    ...
     [{'repository': {'open_issues': 0, 'url': 'https://github.com/...
+
+``r.is_json`` checks whether the response's declared ``Content-Type`` is
+``application/json`` or belongs to the ``application/*+json`` media-type family
+(for example, ``application/problem+json``). Comparison is case-insensitive,
+and semicolon parameters such as ``; charset=utf-8`` are ignored. Missing,
+blank, or nonmatching media types return ``False``, as do comma-joined media
+types and media types malformed by internal whitespace (for example,
+``application /json``).
+
+``r.is_json`` never reads or decodes the response body. A value of ``True``
+does not guarantee that the body is valid or decodable JSON: ``r.json()`` may
+still fail. A value of ``False`` does not prevent you from calling ``r.json()``
+if you expect JSON despite the declared ``Content-Type``.
 
 In case the JSON decoding fails, ``r.json()`` raises an exception. For example, if
 the response gets a 204 (No Content), or if the response contains invalid JSON,

@@ -54,6 +54,7 @@ Lower-Level Classes
    :inherited-members:
 
 .. autoclass:: Response
+   :members: is_json
    :inherited-members:
    :exclude-members: is_permanent_redirect
 
