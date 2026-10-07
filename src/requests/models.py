@@ -70,6 +70,7 @@ from .hooks import default_hooks
 from .status_codes import codes
 from .structures import CaseInsensitiveDict
 from .utils import (
+    _parse_content_type_header,
     check_header_validity,
     get_auth_from_url,
     guess_filename,
@@ -1087,6 +1088,27 @@ class Response:
             content = str(self.content, errors="replace")
 
         return content
+
+    @property
+    def is_json(self) -> bool:
+        """Whether Content-Type declares JSON, without checking the response body.
+
+        True for application/json and application subtypes ending in +json,
+        ignoring case and parameters. This does not guarantee valid JSON;
+        :meth:`json` may still raise a JSONDecodeError.
+        """
+        header = self.headers.get("Content-Type")
+        if not header:
+            return False
+
+        media_type, _ = _parse_content_type_header(header)
+        if "," in media_type or any(char.isspace() for char in media_type):
+            return False
+
+        media_type = media_type.lower()
+        return media_type == "application/json" or (
+            media_type.startswith("application/") and media_type.endswith("+json")
+        )
 
     def json(self, **kwargs: Any) -> Any:
         r"""Decodes the JSON response body (if any) as a Python object.
